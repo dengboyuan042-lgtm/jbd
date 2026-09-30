@@ -13,9 +13,11 @@ import { product } from '@/lib/product';
 export function AuthForm({
   mode,
   next,
+  allowSignup = true,
 }: {
   mode: 'login' | 'register';
   next?: string;
+  allowSignup?: boolean;
 }) {
   const router = useRouter();
   const [email, setEmail] = React.useState('');
@@ -115,12 +117,16 @@ export function AuthForm({
 
         <p className="mt-6 text-center text-xs text-tertiary">
           {mode === 'login' ? (
-            <>
-              No account yet?{' '}
-              <Link href="/register" className="text-accent-text hover:underline">
-                Create one
-              </Link>
-            </>
+            allowSignup ? (
+              <>
+                No account yet?{' '}
+                <Link href="/register" className="text-accent-text hover:underline">
+                  Create one
+                </Link>
+              </>
+            ) : (
+              <>This workspace is private.</>
+            )
           ) : (
             <>
               Already have an account?{' '}

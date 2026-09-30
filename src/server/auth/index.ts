@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
 
+import { env } from '@/lib/env';
 import { getDb } from '@/server/db/client';
 import { migrate } from '@/server/db/migrate';
 import { sessions, users } from '@/server/db/schema';
@@ -79,10 +80,12 @@ export async function startSession(userId: string, userAgent?: string) {
   const expiresAt = new Date(Date.now() + MAX_AGE_SEC * 1000);
   await db.insert(sessions).values({ id: sessionId, userId, expiresAt, userAgent });
   const jar = await cookies();
+  const sameSite = env().COOKIE_SAMESITE;
   jar.set(COOKIE, sessionId, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite,
+    // SameSite=None is only honoured on secure cookies.
+    secure: sameSite === 'none' || process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: MAX_AGE_SEC,
   });

@@ -70,6 +70,10 @@ export function SettingsWorkspace() {
   const [section, setSection] = React.useState<string>('account');
   const [name, setName] = React.useState(user.name);
   const [saving, setSaving] = React.useState(false);
+  const [currentPassword, setCurrentPassword] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [confirmPassword, setConfirmPassword] = React.useState('');
+  const [changing, setChanging] = React.useState(false);
 
   const system = useApi<SystemInfo>('/api/system/info');
   const memories = useApi<{ memories: MemoryRow[] }>('/api/memories?scope=user');
@@ -85,6 +89,28 @@ export function SettingsWorkspace() {
       toast.error(error instanceof Error ? error.message : 'Could not save.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const changePassword = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error('The two new passwords do not match.');
+      return;
+    }
+    setChanging(true);
+    try {
+      await api.patch('/api/settings', { currentPassword, newPassword });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      toast.success('Password changed', {
+        description: 'Other signed-in devices have been signed out.',
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not change password.');
+    } finally {
+      setChanging(false);
     }
   };
 
@@ -125,6 +151,53 @@ export function SettingsWorkspace() {
               <Button variant="primary" size="sm" onClick={saveProfile} loading={saving}>
                 Save changes
               </Button>
+
+              <form
+                onSubmit={changePassword}
+                className="space-y-3 rounded-lg border border-border bg-bg-subtle p-3.5"
+              >
+                <div>
+                  <p className="text-xs font-medium text-fg">Change password</p>
+                  <p className="mt-0.5 text-2xs text-tertiary">
+                    Changing it signs out every other device.
+                  </p>
+                </div>
+                <Field label="Current password">
+                  <Input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                </Field>
+                <Field label="New password" hint="at least 8 characters">
+                  <Input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    autoComplete="new-password"
+                    minLength={8}
+                  />
+                </Field>
+                <Field label="Confirm new password">
+                  <Input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                    minLength={8}
+                  />
+                </Field>
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  size="sm"
+                  loading={changing}
+                  disabled={!currentPassword || newPassword.length < 8}
+                >
+                  Update password
+                </Button>
+              </form>
             </Panel>
           ) : null}
 

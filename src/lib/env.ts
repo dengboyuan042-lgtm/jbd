@@ -10,6 +10,21 @@ const schema = z.object({
     .enum(['development', 'production', 'test'])
     .default('development'),
   AUTH_SECRET: z.string().min(16).default('dev-only-insecure-secret-change-me'),
+  /**
+   * Session cookie policy. Use 'none' when the app is embedded in a
+   * cross-origin iframe (preview shells, embedded dashboards); the cookie is
+   * then forced to Secure, so it still requires HTTPS.
+   */
+  COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+  /**
+   * Close public sign-up once the owner's account exists. The instance then
+   * only admits people who already have credentials; new accounts must be
+   * provisioned with `npm run account:create`.
+   */
+  ALLOW_SIGNUP: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
 
   DATABASE_DRIVER: z.enum(['pglite', 'postgres']).default('pglite'),
   DATABASE_URL: z.string().optional(),
@@ -77,5 +92,6 @@ export function capabilities() {
     speechLive: e.SPEECH_DRIVER !== 'local',
     storageDriver: e.STORAGE_DRIVER,
     databaseDriver: e.DATABASE_DRIVER,
+    allowSignup: e.ALLOW_SIGNUP,
   } as const;
 }
