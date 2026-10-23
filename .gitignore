@@ -1,0 +1,8 @@
+# deps
+node_modules/
+.venv/
+__pycache__/
+
+# scratch renders
+opus-video/*/stills/
+*.log

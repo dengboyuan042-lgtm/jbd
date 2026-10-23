@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Snow Glass — xilo-opus-video</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  @font-face { font-family: Inter200; src: url(fonts/Inter-200.ttf) format('truetype'); font-weight: 200; }
+  @font-face { font-family: Inter300; src: url(fonts/Inter-300.ttf) format('truetype'); font-weight: 300; }
+  @font-face { font-family: Inter400; src: url(fonts/Inter-400.ttf) format('truetype'); font-weight: 400; }
+  @font-face { font-family: Inter500; src: url(fonts/Inter-500.ttf) format('truetype'); font-weight: 500; }
+  @font-face { font-family: Inter600; src: url(fonts/Inter-600.ttf) format('truetype'); font-weight: 600; }
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: #05080d; }
+  body {
+    display: flex; align-items: center; justify-content: center; gap: 28px;
+    font: 500 13px/1.4 "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+    color: rgba(255,255,255,.72);
+    background: radial-gradient(120% 90% at 74% 8%, #12283d 0%, #070c14 58%, #03060b 100%);
+    flex-wrap: wrap; padding: 28px;
+  }
+  .stage { position: relative; }
+  canvas {
+    display: block; height: min(84vh, 900px); width: auto; aspect-ratio: 9 / 16;
+    border-radius: 28px;
+    box-shadow: 0 40px 120px rgba(0,0,0,.7), 0 0 0 1px rgba(255,255,255,.08);
+  }
+  .controls {
+    display: flex; flex-direction: column; gap: 16px; min-width: 236px;
+  }
+  h1 { font-size: 15px; font-weight: 600; color: #fff; margin: 0 0 2px; letter-spacing: .02em; }
+  p { margin: 0; color: rgba(255,255,255,.45); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  button {
+    appearance: none; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.06);
+    color: rgba(255,255,255,.86); border-radius: 10px; padding: 8px 14px; font: inherit; cursor: pointer;
+    transition: background .15s, border-color .15s, transform .15s;
+  }
+  button:hover { background: rgba(255,255,255,.12); }
+  button:active { transform: scale(.97); }
+  button.on { background: rgba(140,196,255,.22); border-color: rgba(140,196,255,.55); color: #fff; }
+  input[type=range] { width: 100%; accent-color: #8fc4ff; }
+  .mono { font-variant-numeric: tabular-nums; color: rgba(255,255,255,.55); }
+</style>
+</head>
+<body>
+  <div class="stage"><canvas id="view" width="1080" height="1920"></canvas></div>
+  <div class="controls">
+    <h1>Snow Glass</h1>
+    <p>Liquid-glass panel · snowfall · 12 s loop</p>
+    <div class="row" id="plans">
+      <button data-plan="a" class="on">A 锁屏</button>
+      <button data-plan="b">B 微距</button>
+      <button data-plan="c">C 穿行</button>
+    </div>
+    <div class="row">
+      <button id="play">暂停</button>
+      <button id="restart">从头</button>
+    </div>
+    <input type="range" id="scrub" min="0" max="12" step="0.01" value="0">
+    <p class="mono" id="readout">t = 0.00 s</p>
+  </div>
+
+<script src="scene/lib.js"></script>
+<script src="scene/scenes.js"></script>
+<script>
+(function () {
+  const DW = 1080, DH = 1920;
+  const cv = document.getElementById('view');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  cv.width = DW * dpr; cv.height = DH * dpr;
+  const ctx = cv.getContext('2d');
+
+  // node renderer registers @napi-rs/canvas; in the browser the same library
+  // makes offscreen canvases from document.createElement
+  SnowGlass.setCanvasFactory((w, h) => {
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h));
+    return c;
+  });
+
+  let plan = 'a';
+  let t = 0, playing = true, last = performance.now();
+  const scrub = document.getElementById('scrub');
+  const readout = document.getElementById('readout');
+
+  function draw(t) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = '#03060b';
+    ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    SnowGlassScenes.draw(plan, ctx, DW, DH, t);
+  }
+
+  // the page also exposes render(t) so the skill's scripts/render.py can drive it
+  window.render = function (sec) { t = sec; draw(sec); readout.textContent = 't = ' + sec.toFixed(2) + ' s'; scrub.value = sec; };
+  window.ready = true;
+
+  function tick(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (playing) {
+      t = (t + dt) % 12;
+      window.render(t);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  document.getElementById('plans').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-plan]');
+    if (!b) return;
+    plan = b.dataset.plan;
+    document.querySelectorAll('[data-plan]').forEach((x) => x.classList.toggle('on', x === b));
+    window.render(t);
+  });
+  document.getElementById('play').addEventListener('click', (e) => {
+    playing = !playing;
+    e.target.textContent = playing ? '暂停' : '播放';
+  });
+  document.getElementById('restart').addEventListener('click', () => window.render(0));
+  scrub.addEventListener('input', () => { playing = false; document.getElementById('play').textContent = '播放'; window.render(parseFloat(scrub.value)); });
+
+  Promise.all([
+    '200 20px Inter200', '300 20px Inter300', '400 20px Inter400',
+    '500 20px Inter500', '600 20px Inter600',
+  ].map((f) => document.fonts.load(f)))
+    .then(() => document.fonts.ready)
+    .then(() => { window.render(0); requestAnimationFrame(tick); });
+})();
+</script>
+</body>
+</html>
